@@ -49,7 +49,7 @@ function buildSeedData(): BudgetStore {
   ]
 
   const incomes: Income[] = [
-    { id: generateId(), source: 'Rabtech', amount: 16727, date: '2026-01-01' },
+    { id: generateId(), source: 'Ravtech', amount: 16727, date: '2026-01-01' },
     { id: generateId(), source: 'אמא', amount: 650, date: '2026-01-01' },
   ]
 
@@ -57,13 +57,21 @@ function buildSeedData(): BudgetStore {
     months: {
       [jan]: { key: jan, expenses, installments, incomes },
     },
+    savings: [],
+    savingsExpenses: [],
   }
 }
 
 function loadStore(): BudgetStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as BudgetStore
+    if (raw) {
+      const parsed = JSON.parse(raw) as BudgetStore
+      // Migrate: add savings if missing
+      if (!parsed.savings) parsed.savings = []
+      if (!parsed.savingsExpenses) parsed.savingsExpenses = []
+      return parsed
+    }
   } catch {
     // corrupt data — start fresh
   }
@@ -271,6 +279,13 @@ export function useBudget() {
     [store, persist]
   )
 
+  const importSavings = useCallback(
+    (entries: import('../types').SavingsEntry[], expenses: import('../types').SavingsExpense[]) => {
+      persist({ ...store, savings: entries, savingsExpenses: expenses })
+    },
+    [store, persist]
+  )
+
   return {
     store,
     getMonth,
@@ -283,6 +298,7 @@ export function useBudget() {
     removeIncome,
     getAllMonthKeys,
     importMonths,
+    importSavings,
     computeSummary,
   }
 }

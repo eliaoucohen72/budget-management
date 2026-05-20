@@ -1,15 +1,17 @@
 import { useState, useRef } from 'react'
-import { parseExcelFile, type ImportResult } from '../utils/excelImport'
-import { CATEGORY_LABELS } from '../types'
+import { parseExcelFile, type ImportResult, type ExcelFileResult } from '../utils/excelImport'
+import { useLang } from '../LanguageContext'
 
 interface Props {
-  onImport: (results: ImportResult[]) => void
+  onImport: (result: ExcelFileResult) => void
 }
 
 type Step = 'idle' | 'preview' | 'done'
 
 export default function ImportExcel({ onImport }: Props) {
+  const { t } = useLang()
   const [step, setStep] = useState<Step>('idle')
+  const [fileResult, setFileResult] = useState<ExcelFileResult | null>(null)
   const [results, setResults] = useState<ImportResult[]>([])
   const [error, setError] = useState<string | null>(null)
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set())
@@ -24,15 +26,16 @@ export default function ImportExcel({ onImport }: Props) {
     try {
       const buffer = await file.arrayBuffer()
       const parsed = parseExcelFile(buffer)
-      if (parsed.length === 0) {
-        setError('Aucun mois valide trouvé dans ce fichier.')
+      if (parsed.months.length === 0) {
+        setError(t.importError)
         return
       }
-      setResults(parsed)
-      setSelectedMonths(new Set(parsed.map((r) => r.monthKey)))
+      setFileResult(parsed)
+      setResults(parsed.months)
+      setSelectedMonths(new Set(parsed.months.map((r) => r.monthKey)))
       setStep('preview')
     } catch (e) {
-      setError(`Erreur de lecture du fichier : ${e instanceof Error ? e.message : String(e)}`)
+      setError(t.importReadError(e instanceof Error ? e.message : String(e)))
     }
   }
 
@@ -52,13 +55,15 @@ export default function ImportExcel({ onImport }: Props) {
   }
 
   const handleConfirm = () => {
+    if (!fileResult) return
     const toImport = results.filter((r) => selectedMonths.has(r.monthKey))
-    onImport(toImport)
+    onImport({ months: toImport, savings: fileResult.savings, savingsExpenses: fileResult.savingsExpenses })
     setStep('done')
   }
 
   const handleReset = () => {
     setStep('idle')
+    setFileResult(null)
     setResults([])
     setError(null)
     setSelectedMonths(new Set())
@@ -70,14 +75,9 @@ export default function ImportExcel({ onImport }: Props) {
     return (
       <div className="bg-green-50 border border-green-300 rounded-xl p-6 text-center space-y-3">
         <div className="text-4xl">✅</div>
-        <p className="font-semibold text-green-800 text-lg">
-          {selectedMonths.size} mois importés avec succès
-        </p>
-        <button
-          onClick={handleReset}
-          className="text-sm text-green-700 underline hover:text-green-900"
-        >
-          Importer un autre fichier
+        <p className="font-semibold text-green-800 text-lg">{t.importSuccess(selectedMonths.size)}</p>
+        <button onClick={handleReset} className="text-sm text-green-700 underline hover:text-green-900">
+          {t.importAnother}
         </button>
       </div>
     )
@@ -87,14 +87,14 @@ export default function ImportExcel({ onImport }: Props) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-800 text-lg">Aperçu de l'importation</h2>
+          <h2 className="font-semibold text-gray-800 text-lg">{t.importPreviewTitle}</h2>
           <button onClick={handleReset} className="text-sm text-gray-400 hover:text-gray-600">
-            ← Choisir un autre fichier
+            {t.chooseAnother}
           </button>
         </div>
 
         <p className="text-sm text-gray-500">
-          Sélectionnez les mois à importer. Les données existantes pour ces mois seront <strong>remplacées</strong>.
+          {t.importWarning} <strong>{t.importWarningBold}</strong>.
         </p>
 
         <div className="space-y-3">
@@ -121,27 +121,27 @@ export default function ImportExcel({ onImport }: Props) {
                   />
                   <span className="font-semibold text-gray-800 flex-1">{r.monthKey}</span>
                   <span className="text-xs text-gray-500 hidden md:flex gap-4">
-                    <span className="text-red-600">{r.monthData.expenses.length} dépenses</span>
-                    <span className="text-purple-600">{r.monthData.installments.length} mensualités</span>
-                    <span className="text-green-600">{r.monthData.incomes.length} revenus</span>
+                    <span className="text-red-600">{r.monthData.expenses.length} {t.navExpenses.toLowerCase()}</span>
+                    <span className="text-purple-600">{r.monthData.installments.length} {t.navInstallments.toLowerCase()}</span>
+                    <span className="text-green-600">{r.monthData.incomes.length} {t.navIncome.toLowerCase()}</span>
                   </span>
                   <button
                     onClick={() => setExpandedMonth(expanded ? null : r.monthKey)}
                     className="text-xs text-blue-500 hover:text-blue-700 ml-2"
                   >
-                    {expanded ? 'Fermer ▲' : 'Détails ▼'}
+                    {expanded ? t.close : t.details}
                   </button>
                 </div>
 
                 <div className="flex flex-wrap gap-2 px-4 pb-3 text-xs">
                   <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                    Revenus {fmt(totalInc)} ₪
+                    {t.incomeLabel} {fmt(totalInc)} ₪
                   </span>
                   <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full">
-                    Dépenses {fmt(totalExp)} ₪
+                    {t.navExpenses} {fmt(totalExp)} ₪
                   </span>
                   <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                    Mensualités {fmt(totalInst)} ₪/mois
+                    {t.installmentsLabel} {fmt(totalInst)} ₪/mois
                   </span>
                 </div>
 
@@ -149,7 +149,7 @@ export default function ImportExcel({ onImport }: Props) {
                   <div className="border-t border-gray-200 bg-white px-4 py-3 space-y-4 text-sm">
                     {r.monthData.incomes.length > 0 && (
                       <div>
-                        <p className="font-medium text-green-700 mb-1">Revenus</p>
+                        <p className="font-medium text-green-700 mb-1">{t.incomeLabel}</p>
                         <table className="w-full text-xs">
                           <tbody className="divide-y divide-gray-100">
                             {r.monthData.incomes.map((inc) => (
@@ -162,37 +162,30 @@ export default function ImportExcel({ onImport }: Props) {
                         </table>
                       </div>
                     )}
-
                     {r.monthData.expenses.filter((e) => e.type === 'fixed').length > 0 && (
                       <div>
-                        <p className="font-medium text-blue-700 mb-1">Dépenses fixes</p>
+                        <p className="font-medium text-blue-700 mb-1">{t.fixedLabel}</p>
                         <table className="w-full text-xs">
                           <tbody className="divide-y divide-gray-100">
-                            {r.monthData.expenses
-                              .filter((e) => e.type === 'fixed')
-                              .map((e) => (
-                                <tr key={e.id}>
-                                  <td className="py-1">{e.label}</td>
-                                  <td className="py-1 text-gray-400">{CATEGORY_LABELS[e.category]}</td>
-                                  <td className="py-1 font-semibold text-red-600">{fmt(e.amount)} ₪</td>
-                                </tr>
-                              ))}
+                            {r.monthData.expenses.filter((e) => e.type === 'fixed').map((e) => (
+                              <tr key={e.id}>
+                                <td className="py-1">{e.label}</td>
+                                <td className="py-1 font-semibold text-red-600">{fmt(e.amount)} ₪</td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
                     )}
-
                     {r.monthData.installments.length > 0 && (
                       <div>
-                        <p className="font-medium text-purple-700 mb-1">Mensualités</p>
+                        <p className="font-medium text-purple-700 mb-1">{t.installmentsLabel}</p>
                         <table className="w-full text-xs">
                           <tbody className="divide-y divide-gray-100">
                             {r.monthData.installments.map((inst) => (
                               <tr key={inst.id}>
                                 <td className="py-1">{inst.label}</td>
-                                <td className="py-1 text-gray-400">
-                                  {inst.paidMonths}/{inst.totalMonths || '∞'}
-                                </td>
+                                <td className="py-1 text-gray-400">{inst.paidMonths}/{inst.totalMonths || '∞'}</td>
                                 <td className="py-1 font-semibold text-purple-600">{fmt(inst.monthlyAmount)} ₪</td>
                               </tr>
                             ))}
@@ -200,21 +193,17 @@ export default function ImportExcel({ onImport }: Props) {
                         </table>
                       </div>
                     )}
-
                     {r.monthData.expenses.filter((e) => e.type === 'variable').length > 0 && (
                       <div>
-                        <p className="font-medium text-amber-700 mb-1">Dépenses variables</p>
+                        <p className="font-medium text-amber-700 mb-1">{t.variableLabel}</p>
                         <table className="w-full text-xs">
                           <tbody className="divide-y divide-gray-100">
-                            {r.monthData.expenses
-                              .filter((e) => e.type === 'variable')
-                              .map((e) => (
-                                <tr key={e.id}>
-                                  <td className="py-1">{e.label}</td>
-                                  <td className="py-1 text-gray-400">{CATEGORY_LABELS[e.category]}</td>
-                                  <td className="py-1 font-semibold text-red-600">{fmt(e.amount)} ₪</td>
-                                </tr>
-                              ))}
+                            {r.monthData.expenses.filter((e) => e.type === 'variable').map((e) => (
+                              <tr key={e.id}>
+                                <td className="py-1">{e.label}</td>
+                                <td className="py-1 font-semibold text-red-600">{fmt(e.amount)} ₪</td>
+                              </tr>
+                            ))}
                           </tbody>
                         </table>
                       </div>
@@ -232,13 +221,10 @@ export default function ImportExcel({ onImport }: Props) {
             disabled={selectedMonths.size === 0}
             className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-medium hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Importer {selectedMonths.size} mois
+            {t.importBtn(selectedMonths.size)}
           </button>
-          <button
-            onClick={handleReset}
-            className="border border-gray-300 text-gray-600 px-5 py-2.5 rounded-xl hover:bg-gray-50 transition"
-          >
-            Annuler
+          <button onClick={handleReset} className="border border-gray-300 text-gray-600 px-5 py-2.5 rounded-xl hover:bg-gray-50 transition">
+            {t.cancel}
           </button>
         </div>
       </div>
@@ -248,10 +234,8 @@ export default function ImportExcel({ onImport }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-gray-800 mb-1">Importer depuis Excel</h2>
-        <p className="text-sm text-gray-500">
-          Déposez un fichier Excel au format dépenses/revenus — chaque onglet mensuel sera importé automatiquement.
-        </p>
+        <h2 className="text-lg font-semibold text-gray-800 mb-1">{t.importTitle}</h2>
+        <p className="text-sm text-gray-500">{t.importDesc}</p>
       </div>
 
       <div
@@ -261,8 +245,8 @@ export default function ImportExcel({ onImport }: Props) {
         className="border-2 border-dashed border-blue-300 rounded-2xl p-12 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition"
       >
         <div className="text-5xl mb-3">📊</div>
-        <p className="font-semibold text-gray-700">Glissez un fichier Excel ici</p>
-        <p className="text-sm text-gray-400 mt-1">ou cliquez pour choisir un fichier</p>
+        <p className="font-semibold text-gray-700">{t.dropZoneTitle}</p>
+        <p className="text-sm text-gray-400 mt-1">{t.dropZoneSubtitle}</p>
         <p className="text-xs text-gray-300 mt-3">.xlsx · .xls</p>
         <input
           ref={inputRef}

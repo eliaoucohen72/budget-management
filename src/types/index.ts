@@ -57,8 +57,20 @@ export interface MonthData {
   incomes: Income[]
 }
 
+export interface SavingsEntry {
+  date: string // YYYY-MM-DD
+  amount: number
+}
+
+export interface SavingsExpense {
+  label: string
+  amount: number
+}
+
 export interface BudgetStore {
   months: Record<string, MonthData>
+  savings: SavingsEntry[]
+  savingsExpenses: SavingsExpense[]
 }
 
 // Derived summary for display

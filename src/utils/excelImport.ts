@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import type { Expense, Installment, Income, MonthData, ExpenseCategory } from '../types'
+import type { Expense, Installment, Income, MonthData, ExpenseCategory, SavingsEntry, SavingsExpense } from '../types'
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -84,13 +84,90 @@ export interface ImportResult {
   monthData: MonthData
 }
 
-export function parseExcelFile(buffer: ArrayBuffer): ImportResult[] {
+export interface ExcelFileResult {
+  months: ImportResult[]
+  savings: SavingsEntry[]
+  savingsExpenses: SavingsExpense[]
+}
+
+const FRENCH_MONTHS: Record<string, number> = {
+  janvier: 1, février: 2, fevrier: 2, mars: 3, avril: 4, mai: 5, juin: 6,
+  juillet: 7, août: 8, aout: 8, septembre: 9, octobre: 10, novembre: 11, décembre: 12, decembre: 12,
+}
+
+// Parse a date cell: Excel serial, "DD/MM/YYYY", "YYYY-MM-DD", or "DD mois YYYY"
+function parseDateCell(cell: string | number): string | null {
+  if (typeof cell === 'number') {
+    const date = XLSX.SSF.parse_date_code(cell)
+    if (date) return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`
+  }
+  if (typeof cell === 'string' && cell.trim()) {
+    const s = cell.trim()
+    // "DD/MM/YYYY"
+    const dmy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
+    // "YYYY-MM-DD"
+    const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (iso) return s.slice(0, 10)
+    // "15 mai 2026" or "15 Mai 2026"
+    const french = s.match(/^(\d{1,2})\s+([a-zéûôàè]+)\s+(\d{4})$/i)
+    if (french) {
+      const monthNum = FRENCH_MONTHS[french[2].toLowerCase()]
+      if (monthNum) return `${french[3]}-${String(monthNum).padStart(2, '0')}-${french[1].padStart(2, '0')}`
+    }
+  }
+  return null
+}
+
+interface SavingsSheetResult {
+  entries: SavingsEntry[]
+  expenses: SavingsExpense[]
+}
+
+function parseSavingsSheet(ws: XLSX.WorkSheet): SavingsSheetResult {
+  const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1, defval: '' })
+  const entries: SavingsEntry[] = []
+  const expenses: SavingsExpense[] = []
+
+  for (const row of rows) {
+    // Col A+B → versements
+    if (row[0] && row[1]) {
+      const date = parseDateCell(row[0] as string | number)
+      const amount = typeof row[1] === 'number' ? row[1] : parseFloat(String(row[1]))
+      if (date && !isNaN(amount) && amount > 0) {
+        entries.push({ date, amount })
+      }
+    }
+    // Col D+E → dépenses prévues
+    if (row[3] && row[4]) {
+      const label = String(row[3]).trim()
+      const amount = typeof row[4] === 'number' ? row[4] : parseFloat(String(row[4]))
+      if (label && !isNaN(amount) && amount > 0) {
+        expenses.push({ label, amount })
+      }
+    }
+  }
+
+  return { entries, expenses }
+}
+
+export function parseExcelFile(buffer: ArrayBuffer): ExcelFileResult {
   const wb = XLSX.read(buffer, { type: 'array' })
   const results: ImportResult[] = []
+  let savings: SavingsEntry[] = []
+  let savingsExpenses: SavingsExpense[] = []
 
   for (const sheetName of wb.SheetNames) {
-    const monthKey = parseSheetName(sheetName)
-    if (!monthKey) continue
+    // Savings sheet — not a monthly budget sheet
+    if (!parseSheetName(sheetName)) {
+      const ws = wb.Sheets[sheetName]
+      const parsed = parseSavingsSheet(ws)
+      if (parsed.entries.length > 0) savings = parsed.entries
+      if (parsed.expenses.length > 0) savingsExpenses = parsed.expenses
+      continue
+    }
+    const monthKey = parseSheetName(sheetName)!
+
 
     const ws = wb.Sheets[sheetName]
     const rows = XLSX.utils.sheet_to_json<RawRow>(ws, { header: 1, defval: '' })
@@ -181,5 +258,5 @@ export function parseExcelFile(buffer: ArrayBuffer): ImportResult[] {
     })
   }
 
-  return results
+  return { months: results, savings, savingsExpenses }
 }

@@ -6,9 +6,9 @@ import IncomeForm from './components/IncomeForm'
 import InstallmentTracker from './components/InstallmentTracker'
 import AnnualView from './components/AnnualView'
 import ImportExcel from './components/ImportExcel'
-import ImportPayslip from './components/ImportPayslip'
+import SavingsView from './components/SavingsView'
 import { useBudget, computeSummary } from './store/budgetStore'
-import type { ImportResult } from './utils/excelImport'
+import type { ExcelFileResult } from './utils/excelImport'
 
 function getCurrentMonthKey(): string {
   const now = new Date()
@@ -25,7 +25,7 @@ export default function App() {
   const [view, setView] = useState<View>('dashboard')
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey)
 
-  const { store, getMonth, importMonths, addIncome } = useBudget()
+  const { store, getMonth, importMonths, importSavings } = useBudget()
 
   const monthData = getMonth(currentMonth)
   const summary = computeSummary(monthData)
@@ -34,18 +34,13 @@ export default function App() {
   const hasNextMonth = shiftMonth(currentMonth, 1) in store.months
   const hasPrevMonth = shiftMonth(currentMonth, -1) in store.months
 
-  const handleImport = (results: ImportResult[]) => {
-    importMonths(results.map((r) => r.monthData))
-    if (results.length > 0) {
-      setCurrentMonth(results[0].monthKey)
+  const handleImport = (result: ExcelFileResult) => {
+    importMonths(result.months.map((r) => r.monthData))
+    if (result.savings.length > 0) importSavings(result.savings, result.savingsExpenses)
+    if (result.months.length > 0) {
+      setCurrentMonth(result.months[0].monthKey)
       setView('dashboard')
     }
-  }
-
-  const handlePayslipImport = (monthKey: string, source: string, amount: number) => {
-    addIncome(monthKey, { source, amount, date: `${monthKey}-01` })
-    setCurrentMonth(monthKey)
-    setView('income')
   }
 
   return (
@@ -64,29 +59,23 @@ export default function App() {
         {view === 'dashboard' && (
           <Dashboard monthData={monthData} summary={summary} />
         )}
-
         {view === 'expenses' && (
           <ExpenseForm monthData={monthData} />
         )}
-
         {view === 'income' && (
           <IncomeForm monthData={monthData} />
         )}
-
         {view === 'installments' && (
           <InstallmentTracker monthData={monthData} />
         )}
-
         {view === 'annual' && (
           <AnnualView store={store} currentYear={currentYear} />
         )}
-
         {view === 'import' && (
           <ImportExcel onImport={handleImport} />
         )}
-
-        {view === 'payslip' && (
-          <ImportPayslip onImport={handlePayslipImport} />
+        {view === 'savings' && (
+          <SavingsView savings={store.savings} plannedExpenses={store.savingsExpenses} />
         )}
       </main>
     </div>
