@@ -93,10 +93,15 @@ export default function SavingsView({ savings, plannedExpenses }: Props) {
               {plannedExpenses.map((e, i) => (
                 <div key={i} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full flex-shrink-0 ${totalSaved >= totalPlanned ? 'bg-green-500' : 'bg-gray-300'}`} />
-                    <span className="text-sm font-medium text-gray-700">{e.label}</span>
+                    <input
+                      type="checkbox"
+                      checked={e.paid}
+                      disabled
+                      className="w-4 h-4 accent-emerald-600"
+                    />
+                    <span className={`text-sm font-medium ${e.paid ? 'line-through text-gray-400' : 'text-gray-700'}`}>{e.label}</span>
                   </div>
-                  <span className="text-sm font-semibold text-gray-800">{fmt(e.amount)} ₪</span>
+                  <span className={`text-sm font-semibold ${e.paid ? 'text-gray-400' : 'text-gray-800'}`}>{fmt(e.amount)} ₪</span>
                 </div>
               ))}
               <div className="mt-4 pt-3 border-t border-gray-100">

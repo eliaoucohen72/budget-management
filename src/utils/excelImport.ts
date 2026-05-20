@@ -138,12 +138,14 @@ function parseSavingsSheet(ws: XLSX.WorkSheet): SavingsSheetResult {
         entries.push({ date, amount })
       }
     }
-    // Col D+E → dépenses prévues
+    // Col D+E+F → dépenses prévues
     if (row[3] && row[4]) {
       const label = String(row[3]).trim()
       const amount = typeof row[4] === 'number' ? row[4] : parseFloat(String(row[4]))
+      const paidRaw = typeof row[5] === 'string' ? row[5].trim().toLowerCase() : ''
+      const paid = paidRaw === 'oui'
       if (label && !isNaN(amount) && amount > 0) {
-        expenses.push({ label, amount })
+        expenses.push({ label, amount, paid })
       }
     }
   }

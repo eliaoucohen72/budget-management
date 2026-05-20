@@ -65,6 +65,7 @@ export interface SavingsEntry {
 export interface SavingsExpense {
   label: string
   amount: number
+  paid: boolean
 }
 
 export interface BudgetStore {

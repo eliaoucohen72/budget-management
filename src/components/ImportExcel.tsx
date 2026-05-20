@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react'
 import { parseExcelFile, type ImportResult, type ExcelFileResult } from '../utils/excelImport'
-import { generateTemplate } from '../utils/templateGenerator'
 import { useLang } from '../LanguageContext'
 
 interface Props {
@@ -273,12 +272,13 @@ export default function ImportExcel({ onImport }: Props) {
               : 'Download a pre-formatted Excel file ready to fill in.'}
           </p>
         </div>
-        <button
-          onClick={generateTemplate}
+        <a
+          href="/budget-template.xlsx"
+          download
           className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition whitespace-nowrap"
         >
           📄 {lang === 'fr' ? 'Télécharger le template' : 'Download template'}
-        </button>
+        </a>
       </div>
 
       {error && (
