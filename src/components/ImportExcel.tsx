@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { parseExcelFile, type ImportResult, type ExcelFileResult } from '../utils/excelImport'
+import { generateTemplate } from '../utils/templateGenerator'
 import { useLang } from '../LanguageContext'
 
 interface Props {
@@ -9,7 +10,7 @@ interface Props {
 type Step = 'idle' | 'preview' | 'done'
 
 export default function ImportExcel({ onImport }: Props) {
-  const { t } = useLang()
+  const { t, lang } = useLang()
   const [step, setStep] = useState<Step>('idle')
   const [fileResult, setFileResult] = useState<ExcelFileResult | null>(null)
   const [results, setResults] = useState<ImportResult[]>([])
@@ -258,6 +259,26 @@ export default function ImportExcel({ onImport }: Props) {
             if (file) handleFile(file)
           }}
         />
+      </div>
+
+      {/* Template download */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-700">
+            {lang === 'fr' ? 'Nouveau utilisateur ?' : 'New user?'}
+          </p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {lang === 'fr'
+              ? 'Télécharge un fichier Excel pré-formaté prêt à remplir.'
+              : 'Download a pre-formatted Excel file ready to fill in.'}
+          </p>
+        </div>
+        <button
+          onClick={generateTemplate}
+          className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition whitespace-nowrap"
+        >
+          📄 {lang === 'fr' ? 'Télécharger le template' : 'Download template'}
+        </button>
       </div>
 
       {error && (
