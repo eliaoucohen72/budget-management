@@ -57,7 +57,7 @@ export default function ImportExcel({ onImport }: Props) {
   const handleConfirm = () => {
     if (!fileResult) return
     const toImport = results.filter((r) => selectedMonths.has(r.monthKey))
-    onImport({ months: toImport, savings: fileResult.savings, savingsExpenses: fileResult.savingsExpenses })
+    onImport({ months: toImport, savingsProjects: fileResult.savingsProjects })
     setStep('done')
   }
 
@@ -214,6 +214,24 @@ export default function ImportExcel({ onImport }: Props) {
             )
           })}
         </div>
+
+        {fileResult && fileResult.savingsProjects.length > 0 && (
+          <div className="border border-emerald-200 bg-emerald-50 rounded-xl px-4 py-3 space-y-1">
+            <p className="text-sm font-semibold text-emerald-800">
+              {lang === 'fr' ? 'Épargne détectée' : 'Savings detected'} ({fileResult.savingsProjects.length})
+            </p>
+            {fileResult.savingsProjects.map((p) => (
+              <div key={p.name} className="flex items-center justify-between text-xs text-emerald-700">
+                <span>{p.name}</span>
+                <span className="text-gray-500">
+                  {p.entries.length} {lang === 'fr' ? 'versements' : 'entries'}
+                  {' · '}
+                  {p.expenses.length} {lang === 'fr' ? 'dépenses prévues' : 'planned expenses'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="flex gap-3 pt-2">
           <button

@@ -1,18 +1,18 @@
+import { useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
-import type { SavingsEntry, SavingsExpense } from '../types'
+import type { SavingsProject } from '../types'
 import { useLang } from '../LanguageContext'
 
 interface Props {
-  savings: SavingsEntry[]
-  plannedExpenses: SavingsExpense[]
+  projects: SavingsProject[]
 }
 
 const fmt = (n: number) =>
   n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-function groupByMonth(entries: SavingsEntry[], lang: string): { month: string; total: number }[] {
+function groupByMonth(entries: { date: string; amount: number }[], lang: string): { month: string; total: number }[] {
   const map: Record<string, number> = {}
   for (const e of entries) {
     const month = e.date.slice(0, 7)
@@ -26,8 +26,13 @@ function groupByMonth(entries: SavingsEntry[], lang: string): { month: string; t
     }))
 }
 
-export default function SavingsView({ savings, plannedExpenses }: Props) {
+export default function SavingsView({ projects }: Props) {
   const { t, lang } = useLang()
+  const [selectedName, setSelectedName] = useState<string>(() => projects[0]?.name ?? '')
+
+  const project = projects.find((p) => p.name === selectedName) ?? projects[0]
+  const savings = project?.entries ?? []
+  const plannedExpenses = project?.expenses ?? []
 
   const totalSaved = savings.reduce((s, e) => s + e.amount, 0)
   const totalPlanned = plannedExpenses.reduce((s, e) => s + e.amount, 0)
@@ -35,7 +40,7 @@ export default function SavingsView({ savings, plannedExpenses }: Props) {
   const byMonth = groupByMonth(savings, lang)
   const sorted = [...savings].sort((a, b) => b.date.localeCompare(a.date))
 
-  if (savings.length === 0 && plannedExpenses.length === 0) {
+  if (projects.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
         {t.noSavingsData}
@@ -45,7 +50,20 @@ export default function SavingsView({ savings, plannedExpenses }: Props) {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-lg font-bold text-gray-800">{t.savingsTitle}</h2>
+      <div className="flex items-center gap-4">
+        <h2 className="text-lg font-bold text-gray-800">{t.savingsTitle}</h2>
+        {projects.length > 1 && (
+          <select
+            value={selectedName}
+            onChange={(e) => setSelectedName(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          >
+            {projects.map((p) => (
+              <option key={p.name} value={p.name}>{p.name}</option>
+            ))}
+          </select>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">

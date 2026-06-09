@@ -25,7 +25,7 @@ export default function App() {
   const [view, setView] = useState<View>('dashboard')
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthKey)
 
-  const { store, getMonth, importMonths, importSavings } = useBudget()
+  const { store, getMonth, importMonths, importSavingsProjects } = useBudget()
 
   const monthData = getMonth(currentMonth)
   const summary = computeSummary(monthData)
@@ -36,7 +36,7 @@ export default function App() {
 
   const handleImport = (result: ExcelFileResult) => {
     importMonths(result.months.map((r) => r.monthData))
-    if (result.savings.length > 0) importSavings(result.savings, result.savingsExpenses)
+    if (result.savingsProjects.length > 0) importSavingsProjects(result.savingsProjects)
     if (result.months.length > 0) {
       setCurrentMonth(result.months[0].monthKey)
       setView('dashboard')
@@ -75,7 +75,7 @@ export default function App() {
           <ImportExcel onImport={handleImport} />
         )}
         {view === 'savings' && (
-          <SavingsView savings={store.savings} plannedExpenses={store.savingsExpenses} />
+          <SavingsView projects={store.savingsProjects} />
         )}
       </main>
     </div>

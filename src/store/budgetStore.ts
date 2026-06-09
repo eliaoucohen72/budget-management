@@ -57,8 +57,7 @@ function buildSeedData(): BudgetStore {
     months: {
       [jan]: { key: jan, expenses, installments, incomes },
     },
-    savings: [],
-    savingsExpenses: [],
+    savingsProjects: [],
   }
 }
 
@@ -66,11 +65,19 @@ function loadStore(): BudgetStore {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as BudgetStore
-      // Migrate: add savings if missing
-      if (!parsed.savings) parsed.savings = []
-      if (!parsed.savingsExpenses) parsed.savingsExpenses = []
-      return parsed
+      const parsed = JSON.parse(raw) as BudgetStore & {
+        savings?: import('../types').SavingsEntry[]
+        savingsExpenses?: import('../types').SavingsExpense[]
+      }
+      // Migrate: convert old flat savings to projects array
+      if (!parsed.savingsProjects) {
+        parsed.savingsProjects = (parsed.savings?.length || parsed.savingsExpenses?.length)
+          ? [{ name: 'Épargne', entries: parsed.savings ?? [], expenses: parsed.savingsExpenses ?? [] }]
+          : []
+        delete parsed.savings
+        delete parsed.savingsExpenses
+      }
+      return parsed as BudgetStore
     }
   } catch {
     // corrupt data — start fresh
@@ -279,9 +286,15 @@ export function useBudget() {
     [store, persist]
   )
 
-  const importSavings = useCallback(
-    (entries: import('../types').SavingsEntry[], expenses: import('../types').SavingsExpense[]) => {
-      persist({ ...store, savings: entries, savingsExpenses: expenses })
+  const importSavingsProjects = useCallback(
+    (projects: import('../types').SavingsProject[]) => {
+      const merged = [...store.savingsProjects]
+      for (const p of projects) {
+        const idx = merged.findIndex((x) => x.name === p.name)
+        if (idx >= 0) merged[idx] = p
+        else merged.push(p)
+      }
+      persist({ ...store, savingsProjects: merged })
     },
     [store, persist]
   )
@@ -298,7 +311,7 @@ export function useBudget() {
     removeIncome,
     getAllMonthKeys,
     importMonths,
-    importSavings,
+    importSavingsProjects,
     computeSummary,
   }
 }

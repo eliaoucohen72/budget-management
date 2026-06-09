@@ -68,10 +68,15 @@ export interface SavingsExpense {
   paid: boolean
 }
 
+export interface SavingsProject {
+  name: string
+  entries: SavingsEntry[]
+  expenses: SavingsExpense[]
+}
+
 export interface BudgetStore {
   months: Record<string, MonthData>
-  savings: SavingsEntry[]
-  savingsExpenses: SavingsExpense[]
+  savingsProjects: SavingsProject[]
 }
 
 // Derived summary for display

@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import type { Expense, Installment, Income, MonthData, ExpenseCategory, SavingsEntry, SavingsExpense } from '../types'
+import type { Expense, Installment, Income, MonthData, ExpenseCategory, SavingsEntry, SavingsExpense, SavingsProject } from '../types'
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
@@ -86,8 +86,7 @@ export interface ImportResult {
 
 export interface ExcelFileResult {
   months: ImportResult[]
-  savings: SavingsEntry[]
-  savingsExpenses: SavingsExpense[]
+  savingsProjects: SavingsProject[]
 }
 
 const FRENCH_MONTHS: Record<string, number> = {
@@ -138,13 +137,16 @@ function parseSavingsSheet(ws: XLSX.WorkSheet): SavingsSheetResult {
         entries.push({ date, amount })
       }
     }
-    // Col D+E+F → dépenses prévues
-    if (row[3] && row[4]) {
-      const label = String(row[3]).trim()
-      const amount = typeof row[4] === 'number' ? row[4] : parseFloat(String(row[4]))
-      const paidRaw = typeof row[5] === 'string' ? row[5].trim().toLowerCase() : ''
-      const paid = paidRaw === 'oui'
+    // Dépenses prévues : cherche la première colonne avec un label texte non vide (à partir de l'index 3),
+    // suivie d'un nombre positif, puis cherche "oui"/"non" dans les colonnes suivantes
+    const labelIdx = row.findIndex((c, i) => i >= 3 && typeof c === 'string' && c.trim().length > 0)
+    if (labelIdx >= 0) {
+      const label = String(row[labelIdx]).trim()
+      const amountVal = row[labelIdx + 1]
+      const amount = typeof amountVal === 'number' ? amountVal : parseFloat(String(amountVal))
       if (label && !isNaN(amount) && amount > 0) {
+        const paidCol = row.slice(labelIdx + 2).find((c) => typeof c === 'string' && /^(oui|non)$/i.test(c.trim()))
+        const paid = typeof paidCol === 'string' && paidCol.trim().toLowerCase() === 'oui'
         expenses.push({ label, amount, paid })
       }
     }
@@ -156,16 +158,16 @@ function parseSavingsSheet(ws: XLSX.WorkSheet): SavingsSheetResult {
 export function parseExcelFile(buffer: ArrayBuffer): ExcelFileResult {
   const wb = XLSX.read(buffer, { type: 'array' })
   const results: ImportResult[] = []
-  let savings: SavingsEntry[] = []
-  let savingsExpenses: SavingsExpense[] = []
+  const savingsProjects: SavingsProject[] = []
 
   for (const sheetName of wb.SheetNames) {
     // Savings sheet — not a monthly budget sheet
     if (!parseSheetName(sheetName)) {
       const ws = wb.Sheets[sheetName]
       const parsed = parseSavingsSheet(ws)
-      if (parsed.entries.length > 0) savings = parsed.entries
-      if (parsed.expenses.length > 0) savingsExpenses = parsed.expenses
+      if (parsed.entries.length > 0 || parsed.expenses.length > 0) {
+        savingsProjects.push({ name: sheetName, entries: parsed.entries, expenses: parsed.expenses })
+      }
       continue
     }
     const monthKey = parseSheetName(sheetName)!
@@ -260,5 +262,5 @@ export function parseExcelFile(buffer: ArrayBuffer): ExcelFileResult {
     })
   }
 
-  return { months: results, savings, savingsExpenses }
+  return { months: results, savingsProjects }
 }
