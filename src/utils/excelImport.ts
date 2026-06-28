@@ -51,16 +51,6 @@ function parseSheetName(name: string): string | null {
 
 type RawRow = (string | number)[]
 
-const HEADER_LABELS = new Set(['הוצאות', 'הכנסות', 'תשלומים', ''])
-
-// A row with a numeric value in col C marks the start of a new section,
-// but only when col A is a real expense label (not a global header row)
-function isSectionMarker(row: RawRow): boolean {
-  if (typeof row[2] !== 'number' || (row[2] as number) <= 0) return false
-  const label = typeof row[0] === 'string' ? row[0].trim() : ''
-  return !HEADER_LABELS.has(label) && typeof row[0] !== 'number'
-}
-
 function isValidExpenseRow(row: RawRow): boolean {
   return (
     typeof row[0] === 'string' &&
@@ -183,8 +173,13 @@ export function parseExcelFile(buffer: ArrayBuffer): ExcelFileResult {
     const [year, month] = monthKey.split('-')
     const defaultDate = `${year}-${month}-01`
 
+    // Sections are separated by blank rows. The blocks always appear in the
+    // same order: 0 = fixed, 1 = installments, 2+ = variable. A col-C total on
+    // a section's first row is optional (some months omit it on the variable
+    // block), so we drive section boundaries off the blank separators instead.
     // Sections: 0 = fixed, 1 = installments, 2 = variable
     let sectionIndex = -1
+    let separatorSeen = false
 
     for (const row of rows) {
       // Collect incomes from col E+F regardless of section
@@ -197,14 +192,20 @@ export function parseExcelFile(buffer: ArrayBuffer): ExcelFileResult {
         })
       }
 
-      // A section marker advances to the next section and also processes its own first row
-      if (isSectionMarker(row)) {
-        sectionIndex++
-        // The marker row itself may carry a valid expense (first item of the section)
-        if (!isValidExpenseRow(row)) continue
-      } else {
-        if (!isValidExpenseRow(row)) continue
+      if (!isValidExpenseRow(row)) {
+        // A separator row (no col A/B expense) ends the current section block.
+        // Mark it so the next valid expense row opens the next section.
+        if (sectionIndex >= 0) separatorSeen = true
+        continue
       }
+
+      // First expense row of a new block: advance the section.
+      if (sectionIndex === -1) {
+        sectionIndex = 0
+      } else if (separatorSeen) {
+        sectionIndex++
+      }
+      separatorSeen = false
 
       const rawLabel = (row[0] as string).trim()
       const amount = row[1] as number

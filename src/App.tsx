@@ -3,7 +3,6 @@ import Navigation, { type View } from './components/Navigation'
 import Dashboard from './components/Dashboard'
 import ExpenseForm from './components/ExpenseForm'
 import IncomeForm from './components/IncomeForm'
-import InstallmentTracker from './components/InstallmentTracker'
 import AnnualView from './components/AnnualView'
 import ImportExcel from './components/ImportExcel'
 import SavingsView from './components/SavingsView'
@@ -64,9 +63,6 @@ export default function App() {
         )}
         {view === 'income' && (
           <IncomeForm monthData={monthData} />
-        )}
-        {view === 'installments' && (
-          <InstallmentTracker monthData={monthData} />
         )}
         {view === 'annual' && (
           <AnnualView store={store} currentYear={currentYear} />

@@ -122,6 +122,17 @@ export function useBudget() {
     setStore(updated)
   }, [])
 
+  // Functional variant: derives the next store from the latest state, so
+  // multiple updates dispatched in the same tick compose instead of each
+  // overwriting the others from a stale `store` closure.
+  const persistWith = useCallback((updater: (prev: BudgetStore) => BudgetStore) => {
+    setStore((prev) => {
+      const updated = updater(prev)
+      saveStore(updated)
+      return updated
+    })
+  }, [])
+
   // Sync across tabs
   useEffect(() => {
     const handler = (e: StorageEvent) => {
@@ -274,29 +285,30 @@ export function useBudget() {
 
   const importMonths = useCallback(
     (months: MonthData[]) => {
-      const updated: BudgetStore = {
-        ...store,
+      persistWith((prev) => ({
+        ...prev,
         months: {
-          ...store.months,
+          ...prev.months,
           ...Object.fromEntries(months.map((m) => [m.key, m])),
         },
-      }
-      persist(updated)
+      }))
     },
-    [store, persist]
+    [persistWith]
   )
 
   const importSavingsProjects = useCallback(
     (projects: import('../types').SavingsProject[]) => {
-      const merged = [...store.savingsProjects]
-      for (const p of projects) {
-        const idx = merged.findIndex((x) => x.name === p.name)
-        if (idx >= 0) merged[idx] = p
-        else merged.push(p)
-      }
-      persist({ ...store, savingsProjects: merged })
+      persistWith((prev) => {
+        const merged = [...prev.savingsProjects]
+        for (const p of projects) {
+          const idx = merged.findIndex((x) => x.name === p.name)
+          if (idx >= 0) merged[idx] = p
+          else merged.push(p)
+        }
+        return { ...prev, savingsProjects: merged }
+      })
     },
-    [store, persist]
+    [persistWith]
   )
 
   return {

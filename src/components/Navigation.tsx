@@ -1,6 +1,6 @@
 import { useLang } from '../LanguageContext'
 
-export type View = 'dashboard' | 'expenses' | 'income' | 'installments' | 'annual' | 'import' | 'savings'
+export type View = 'dashboard' | 'expenses' | 'income' | 'annual' | 'import' | 'savings'
 
 interface Props {
   activeView: View
@@ -33,7 +33,6 @@ export default function Navigation({
     { view: 'dashboard', label: t.navDashboard },
     { view: 'expenses', label: t.navExpenses },
     { view: 'income', label: t.navIncome },
-    { view: 'installments', label: t.navInstallments },
   ]
 
   const GLOBAL_TABS: { view: View; label: string }[] = [
